@@ -1,0 +1,21 @@
+# Editors / IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# AI coding agents / tools
+.codex/
+.tare/
+.cursor/
+.claude/
+.aider*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs / temp
+*.log
+tmp/
+temp/
