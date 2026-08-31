@@ -1,0 +1,4 @@
+interface:
+  display_name: "WSL1 PM2 Windows"
+  short_description: "Supervise Windows processes from WSL1 PM2"
+  default_prompt: "Use $wsl1-pm2-windows to configure and verify this Windows command under WSL1 PM2 with the appropriate bridge backend."

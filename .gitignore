@@ -1,0 +1,22 @@
+# Editors / IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs / temp
+*.log
+tmp/
+temp/
+
+# Build output: the portable packaged EXE lives under skill/
+/build/*
+!/build/.gitkeep
+
+# Python cache
+__pycache__/
+*.py[cod]
