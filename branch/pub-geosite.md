@@ -118,7 +118,7 @@ jsDelivr:    https://cdn.jsdelivr.net/gh/aweyonhub/awey-pub@pub-geosite/dist/geo
 
 - **谁写入**：`aweyonhub/awey-pub` 自己的 GitHub Actions（`.github/workflows/geosite.yml`），
   用仓库内置 `GITHUB_TOKEN` force-push。**不需要** `PUBLIC_REPO_TOKEN` 那类跨仓库写权限。
-- **什么时候更新**：每天 **18:23 UTC（次日 02:23 CST）**。上游内容没变时**不产生提交**。
+- **什么时候更新**：**每周五 11:17 CST（03:17 UTC）**。上游内容没变时**不产生提交**。
   分钟刻意不取 0 —— GitHub 文档说整点是负载高峰，`schedule` 可能被延迟甚至丢弃。
 - **为什么定时任务放在公开仓库**：GitHub 的 `schedule` 触发器在私有仓库上不可靠
   （免费账号下可能根本不触发）。本仓库公开，且每天都有 push，

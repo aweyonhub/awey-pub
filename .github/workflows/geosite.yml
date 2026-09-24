@@ -12,11 +12,18 @@ name: geosite
 # pub-geosite 上只能手动 workflow_dispatch。
 on:
   schedule:
-    # 18:23 UTC = 次日 02:23 Asia/Shanghai。分钟刻意不取 0：GitHub 文档说整点是
-    # 负载高峰，"the schedule event can be delayed... some queued jobs may be
+    # 每周五 03:17 UTC = **周五 11:17 Asia/Shanghai**。
+    # GitHub 的 cron 用 UTC，北京时间减 8 小时；11:17 - 8 = 03:17，仍落在同一天。
+    #
+    # 分钟刻意不取 0：GitHub 文档说整点是负载高峰，"the schedule event can be
+    # delayed during periods of high loads... High load times include the start of
+    # every hour. If the load is sufficiently high enough, some queued jobs may be
     # dropped. To decrease the chance of delay, schedule your workflow to run at a
     # different time of the hour."
-    - cron: "23 18 * * *"
+    #
+    # 注意这是**每周一次**：上游规则表可能出现最多 7 天的滞后期。内容没变时下面
+    # 的步骤仍会跳过 push，所以不会产生空提交。
+    - cron: "17 3 * * 5"
   workflow_dispatch:
 
 permissions:
