@@ -91,8 +91,18 @@ jsDelivr:    https://cdn.jsdelivr.net/gh/aweyonhub/awey-pub@pub-geosite/dist/geo
 清单:        https://raw.githubusercontent.com/aweyonhub/awey-pub/pub-geosite/dist/manifest-geodata.json
 ```
 
-> **jsDelivr 有缓存。** 每次发布后 CI 会主动 purge；若仍拿到旧文件，
-> 加 `?t=$(date +%s)` 绕过。
+> **两个 CDN 都有缓存，更新后要等一两分钟。**
+>
+> 实测：force-push 完立刻用 `raw.githubusercontent.com` 拉，拿到的还是上一版
+> （`?t=<时间戳>` 也绕不过），**约 2 分钟**后自动刷新。jsDelivr 同理，CI 会主动
+> purge，若仍拿到旧文件就加 `?t=$(date +%s)`。
+>
+> 紧急需要最新版时用 GitHub API（不走 CDN）：
+>
+> ```bash
+> gh api repos/aweyonhub/awey-pub/contents/dist/geosite.dat?ref=pub-geosite \
+>   --jq '.content' | base64 -d > geosite.dat
+> ```
 
 ## 数据来源
 
