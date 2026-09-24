@@ -221,15 +221,22 @@ jobs:
           url="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
 
           # 内容没变就不提交。定时任务每周跑，上游不动时不应该每周多一个提交。
-          # 只比对两个 .dat；manifest 的 generated_at 每次都不同，纳入判定会天天
-          # 产生空提交。这样 manifest 的语义反而更准：它描述的是「这份 dat 内容
-          # 是什么时候生成的」。
+          #
+          # 比对**整棵树**，不是只看两个 .dat。只看 .dat 有个陷阱：README、
+          # .gitattributes、workflow 副本这些文件的改动永远推不上去 —— 要等到
+          # 规则数据也变了才顺带带上。实测踩到过：改了排期说明，workflow 跑绿，
+          # 分支内容纹丝不动。
+          #
+          # manifest 例外：它的 generated_at 每次都不同。数据没变时沿用分支上那份,
+          # 因为它的语义本来就是「这份 data 是什么时候生成的」—— 数据没变就不该变。
           if git ls-remote --exit-code --heads "$url" "$TARGET_BRANCH" >/dev/null 2>&1; then
             old="$(mktemp -d)"
             if git clone -q --depth=1 --branch "$TARGET_BRANCH" "$url" "$old" 2>/dev/null; then
-              if diff -q "dist/geosite.dat" "$old/dist/geosite.dat" >/dev/null 2>&1 &&
-                 diff -q "dist/geoip.dat" "$old/dist/geoip.dat" >/dev/null 2>&1; then
-                echo "geosite.dat / geoip.dat 与 ${TARGET_BRANCH} 上现有内容一致，跳过 push"
+              if [ -f "$old/dist/manifest-geodata.json" ]; then
+                cp "$old/dist/manifest-geodata.json" publish/dist/manifest-geodata.json
+              fi
+              if diff -r --exclude=.git "$old" publish >/dev/null 2>&1; then
+                echo "内容与 ${TARGET_BRANCH} 上现有内容逐文件一致，跳过 push"
                 branch_gen="$(yq -r '.generated_at // "(unreadable)"' "$old/dist/manifest-geodata.json" 2>/dev/null || echo "(unreadable)")"
                 local_gen="$(yq -r '.generated_at // "(unreadable)"' dist/manifest-geodata.json 2>/dev/null || echo "(unreadable)")"
                 {
@@ -242,6 +249,8 @@ jobs:
                 rm -rf "$old"
                 exit 0
               fi
+              echo "与 ${TARGET_BRANCH} 有差异："
+              diff -rq --exclude=.git "$old" publish | sed 's/^/  /' || true
             fi
             rm -rf "$old"
           fi
