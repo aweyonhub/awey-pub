@@ -1,0 +1,232 @@
+name: geosite
+
+# 每天重建 dae 用的 geosite.dat / geoip.dat，force-push 到本仓库的 pub-geosite 分支。
+#
+# 为什么这个定时任务放在公开仓库而不是私有仓库：
+# GitHub 的 schedule 触发器在私有仓库上不可靠（免费账号下可能根本不触发，
+# 且公开仓库另有「60 天无活动自动禁用」规则）。本仓库是公开的，而且每天都
+# 有 push，两个问题都不存在。私有仓库那边保留了 .github/workflows/geodata.yml
+# 作为手动备份出口。
+#
+# 注意：本文件必须存在于**默认分支**（main）上 schedule 才会触发。放在
+# pub-geosite 上只能手动 workflow_dispatch。
+on:
+  schedule:
+    # 18:23 UTC = 次日 02:23 Asia/Shanghai。分钟刻意不取 0：GitHub 文档说整点是
+    # 负载高峰，"the schedule event can be delayed... some queued jobs may be
+    # dropped. To decrease the chance of delay, schedule your workflow to run at a
+    # different time of the hour."
+    - cron: "23 18 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write # 写本仓库的 pub-geosite 分支
+
+concurrency:
+  group: geosite
+  cancel-in-progress: false
+
+env:
+  SOURCE_REPO: aweyonhub/awey-mihomo
+  SOURCE_REF: main
+  TARGET_BRANCH: pub-geosite
+  OUT_DIR: dist
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      # 配置（仓库 Settings → Secrets）：
+      #   secrets.SOURCE_REPO_TOKEN = 对私有仓库 aweyonhub/awey-mihomo 有读权限的 PAT
+      - name: Clone the private source repo
+        shell: bash
+        env:
+          SOURCE_REPO_TOKEN: ${{ secrets.SOURCE_REPO_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${SOURCE_REPO_TOKEN:-}" ]]; then
+            echo "::error::SOURCE_REPO_TOKEN is not set; cannot read ${SOURCE_REPO}" >&2
+            exit 1
+          fi
+          # 只取需要的两个文件所在的最小历史。
+          git clone -q --depth=1 --branch "$SOURCE_REF" \
+            "https://x-access-token:${SOURCE_REPO_TOKEN}@github.com/${SOURCE_REPO}.git" src
+          git -C src rev-parse HEAD >.source-sha
+          echo "source commit: $(cat .source-sha)"
+          test -f src/scripts/build-dat.py
+          test -f src/config/40-rule-providers.yaml
+          test -f src/dae/pub-geosite/README.md
+
+      - name: Install pinned yq
+        shell: bash
+        run: |
+          set -euo pipefail
+          # 与私有仓库 build.yml / release.yml / geodata.yml 同一个版本与 sha256：
+          # build-dat.py 通过 PATH 调用 yq，版本漂移会改变它读声明文件的结果。
+          curl --fail --silent --show-error --location \
+            https://github.com/mikefarah/yq/releases/download/v4.53.6/yq_linux_amd64 \
+            --output "$RUNNER_TEMP/yq"
+          echo "c5f056448f973ae7d39b5401949648a78f2dc1947d6a8eb65be60d5c504b9385  $RUNNER_TEMP/yq" | sha256sum --check
+          chmod +x "$RUNNER_TEMP/yq"
+          echo "$RUNNER_TEMP" >>"$GITHUB_PATH"
+
+      - name: Build geosite.dat and geoip.dat
+        shell: bash
+        run: |
+          set -euo pipefail
+          # build-dat.py 自带自检：用一个与编码器独立实现的解码器把两个产物解回来，
+          # 再和本次解析出的源数据逐条比对。不传 --base 是刻意的 —— 私有仓库里
+          # 所有 dae 规则引用的分类都由 geo-build 声明覆盖，DLC 那 1500 多个分类
+          # 一个都用不到。
+          python3 src/scripts/build-dat.py \
+            --config src/config/40-rule-providers.yaml \
+            --out-dir "$OUT_DIR"
+          test -s "$OUT_DIR/geosite.dat"
+          test -s "$OUT_DIR/geoip.dat"
+
+      - name: Write manifest
+        shell: bash
+        env:
+          SOURCE_SHA_FILE: .source-sha
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          import time
+
+          out = os.environ["OUT_DIR"]
+          entries = {}
+          for name in ("geosite.dat", "geoip.dat"):
+              path = os.path.join(out, name)
+              data = open(path, "rb").read()
+              entries[name] = {"size": len(data), "sha256": hashlib.sha256(data).hexdigest()}
+              print("%-14s %9d B  %s" % (name, len(data), entries[name]["sha256"]))
+
+          # 声明文件与构建脚本本身也进 manifest，这样「上游声明改了但产物没变」也看得见。
+          for key, path in (
+              ("config/40-rule-providers.yaml", "src/config/40-rule-providers.yaml"),
+              ("scripts/build-dat.py", "src/scripts/build-dat.py"),
+          ):
+              entries[key] = {"sha256": hashlib.sha256(open(path, "rb").read()).hexdigest()}
+
+          with open(os.environ["SOURCE_SHA_FILE"]) as fh:
+              source_commit = fh.read().strip()
+
+          manifest = {
+              "generated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+              "source_repo": os.environ["SOURCE_REPO"],
+              "source_commit": source_commit,
+              "source_ref": os.environ["SOURCE_REF"],
+              "run_url": os.environ.get("RUN_URL", ""),
+              "files": entries,
+          }
+          with open(os.path.join(out, "manifest-geodata.json"), "w") as fh:
+              json.dump(manifest, fh, indent=2, sort_keys=True)
+              fh.write("\n")
+          PY
+
+      - name: Assemble branch tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          # 分支布局：
+          #   .github/workflows/geosite.yml   这个 workflow 自身（分支自描述）
+          #   .gitattributes / .gitignore
+          #   README.md                       从私有仓库的模板拷来
+          #   dist/                           三个产物
+          rm -rf publish
+          mkdir -p publish/.github/workflows
+          cp .github/workflows/geosite.yml publish/.github/workflows/
+          cp src/dae/pub-geosite/README.md publish/README.md
+          cp -R dist publish/dist
+
+          cat >publish/.gitattributes <<'EOF'
+          # 产物是二进制 protobuf，任何换行转换都会损坏它
+          *.dat binary
+          *.json text eol=lf
+          *.md text eol=lf
+          *.yml text eol=lf
+          .gitignore text eol=lf
+          /.gitattributes text eol=lf
+          EOF
+
+          cat >publish/.gitignore <<'EOF'
+          .DS_Store
+          *.log
+          EOF
+
+          chmod 644 publish/README.md publish/.gitignore publish/.gitattributes \
+            publish/.github/workflows/geosite.yml
+          chmod 644 publish/dist/*
+          find publish -type f | sort | sed 's/^/  /'
+
+      - name: Publish branch
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          url="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+
+          # 内容没变就不提交。定时任务每天跑，上游不动时不应该每天多一个提交。
+          # 只比对两个 .dat；manifest 的 generated_at 每次都不同，纳入判定会天天
+          # 产生空提交。这样 manifest 的语义反而更准：它描述的是「这份 dat 内容
+          # 是什么时候生成的」。
+          if git ls-remote --exit-code --heads "$url" "$TARGET_BRANCH" >/dev/null 2>&1; then
+            old="$(mktemp -d)"
+            if git clone -q --depth=1 --branch "$TARGET_BRANCH" "$url" "$old" 2>/dev/null; then
+              if diff -q "dist/geosite.dat" "$old/dist/geosite.dat" >/dev/null 2>&1 &&
+                 diff -q "dist/geoip.dat" "$old/dist/geoip.dat" >/dev/null 2>&1; then
+                echo "geosite.dat / geoip.dat 与 ${TARGET_BRANCH} 上现有内容一致，跳过 push"
+                branch_gen="$(yq -r '.generated_at // "(unreadable)"' "$old/dist/manifest-geodata.json" 2>/dev/null || echo "(unreadable)")"
+                local_gen="$(yq -r '.generated_at // "(unreadable)"' dist/manifest-geodata.json 2>/dev/null || echo "(unreadable)")"
+                {
+                  echo "### geodata 无变化"
+                  echo "上游规则表未更新，\`${TARGET_BRANCH}\` 分支保持原样。"
+                  echo ""
+                  echo "- 分支现有内容生成于: ${branch_gen}"
+                  echo "- 本次重新生成于: ${local_gen}"
+                } >>"${GITHUB_STEP_SUMMARY}"
+                rm -rf "$old"
+                exit 0
+              fi
+            fi
+            rm -rf "$old"
+          fi
+
+          # 单提交分支（orphan）：每次都从空仓库重建再 force push，分支上不留历史。
+          # 只被机器拉取，历史没有价值，而单提交让 clone 永远是 O(1)。
+          (
+            cd publish
+            git init -q -b "$TARGET_BRANCH"
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add -A
+            git commit -q -m "geodata $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            git remote add origin "$url"
+            git push --force origin "HEAD:refs/heads/${TARGET_BRANCH}"
+          )
+
+          {
+            echo "### geodata 已发布到 \`${GITHUB_REPOSITORY}@${TARGET_BRANCH}\`"
+            echo ""
+            for f in dist/geosite.dat dist/geoip.dat dist/manifest-geodata.json; do
+              name="$(basename "$f")"
+              echo "- **${name}**（$(stat -c %s "$f") B）"
+              echo "  - raw: https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${TARGET_BRANCH}/dist/${name}"
+              echo "  - jsDelivr: https://cdn.jsdelivr.net/gh/${GITHUB_REPOSITORY}@${TARGET_BRANCH}/dist/${name}"
+            done
+          } >>"${GITHUB_STEP_SUMMARY}"
+
+          # 刷新 jsDelivr 缓存（失败不影响发布）
+          for f in geosite.dat geoip.dat manifest-geodata.json; do
+            curl -fsS -m 20 "https://purge.jsdelivr.net/gh/${GITHUB_REPOSITORY}@${TARGET_BRANCH}/dist/$f" || true
+          done
