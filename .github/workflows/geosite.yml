@@ -1,12 +1,12 @@
 name: geosite
 
-# 每天重建 dae 用的 geosite.dat / geoip.dat，force-push 到本仓库的 pub-geosite 分支。
+# 每周五重建 dae 用的 geosite.dat / geoip.dat，force-push 到本仓库的 pub-geosite 分支。
 #
 # 为什么这个定时任务放在公开仓库而不是私有仓库：
 # GitHub 的 schedule 触发器在私有仓库上不可靠（免费账号下可能根本不触发，
-# 且公开仓库另有「60 天无活动自动禁用」规则）。本仓库是公开的，而且每天都
-# 有 push，两个问题都不存在。私有仓库那边保留了 .github/workflows/geodata.yml
-# 作为手动备份出口。
+# 且公开仓库另有「60 天无活动自动禁用」规则）。本仓库是公开的，而且每周都
+# 有 push，两个问题都不存在。私有仓库 aweyonhub/awey-mihomo 的 dae/pub-geosite/
+# 下留了**本文件的副本**，只作对照与留档，不会被注册成 workflow。
 #
 # 注意：本文件必须存在于**默认分支**（main）上 schedule 才会触发。放在
 # pub-geosite 上只能手动 workflow_dispatch。
@@ -72,7 +72,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # 与私有仓库的 build.yml / release.yml / geodata.yml 同一个版本与 sha256：
+          # 与私有仓库的 build.yml / release.yml 同一个版本与 sha256：
           # build-dat.py 通过 PATH 调用 yq，版本漂移会改变它读声明文件的结果。
           curl --fail --silent --show-error --location \
             https://github.com/mikefarah/yq/releases/download/v4.53.6/yq_linux_amd64 \
@@ -139,9 +139,8 @@ jobs:
               fh.write("\n")
           PY
 
-      # 这里刻意**没有** artifact 上传步骤：分支就是产物出口，同一份东西存两处
-      # 没有意义。备份通道（dae/pub-geosite/geodata.yml）有 —— 那边不设
-      # vars.PUBLIC_REPO 时没有任何发布出口，artifact 是唯一能拿到产物的方式。
+      # 这里刻意没有 artifact 上传步骤 —— 分支就是产物出口。私有仓库的
+      # dae/pub-geosite/ 下只有本文件的副本，没有任何构建或发布流程。
 
       - name: Assemble branch tree
         shell: bash
@@ -174,7 +173,7 @@ jobs:
           ```
 
           由私有仓库 [`aweyonhub/awey-mihomo`](https://github.com/aweyonhub/awey-mihomo)
-          每天构建，源全部是公开规则表，所以本分支**不含任何个人配置或凭证**。
+          每周构建，源全部是公开规则表，所以本分支**不含任何个人配置或凭证**。
 
           ## 用法
 
@@ -221,7 +220,7 @@ jobs:
           set -euo pipefail
           url="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
 
-          # 内容没变就不提交。定时任务每天跑，上游不动时不应该每天多一个提交。
+          # 内容没变就不提交。定时任务每周跑，上游不动时不应该每周多一个提交。
           # 只比对两个 .dat；manifest 的 generated_at 每次都不同，纳入判定会天天
           # 产生空提交。这样 manifest 的语义反而更准：它描述的是「这份 dat 内容
           # 是什么时候生成的」。

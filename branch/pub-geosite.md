@@ -6,7 +6,7 @@
 ## 这个分支是干什么的
 
 向 [dae](https://github.com/daeuniverse/dae)（eBPF 透明代理）分发规则数据。
-私有仓库 `aweyonhub/awey-mihomo` 每天构建一次，CI 自动推送到本分支。
+私有仓库 `aweyonhub/awey-mihomo` 每周构建一次，CI 自动推送到本分支。
 
 分支上**只有数据和一份自述文档**，没有明文配置、节点信息或凭证：
 
@@ -121,9 +121,9 @@ jsDelivr:    https://cdn.jsdelivr.net/gh/aweyonhub/awey-pub@pub-geosite/dist/geo
 - **什么时候更新**：**每周五 11:17 CST（03:17 UTC）**。上游内容没变时**不产生提交**。
   分钟刻意不取 0 —— GitHub 文档说整点是负载高峰，`schedule` 可能被延迟甚至丢弃。
 - **为什么定时任务放在公开仓库**：GitHub 的 `schedule` 触发器在私有仓库上不可靠
-  （免费账号下可能根本不触发）。本仓库公开，且每天都有 push，
-  「60 天无活动自动禁用」也碰不到。私有仓库 `aweyonhub/awey-mihomo` 保留了
-  `.github/workflows/geodata.yml` 作为**手动备份出口**。
+  （免费账号下可能根本不触发）。本仓库公开，且每周都有 push，
+  「60 天无活动自动禁用」也碰不到。私有仓库 `aweyonhub/awey-mihomo` 那边**只是
+  留了本 workflow 的一份副本**（`dae/pub-geosite/`），作对照与留档，不运行。
 - **需要什么 secret**：本仓库的 `SOURCE_REPO_TOKEN` —— 对私有仓库
   `aweyonhub/awey-mihomo` 有**只读**权限的 token（CI 要 clone 它来跑构建脚本）。
 - **workflow 必须以 `main` 上的文件为准**：GitHub 只在**默认分支**上发现 workflow，
@@ -135,7 +135,7 @@ jsDelivr:    https://cdn.jsdelivr.net/gh/aweyonhub/awey-pub@pub-geosite/dist/geo
 | | [pub-mi](https://github.com/aweyonhub/awey-pub/tree/pub-mi) | pub-geosite |
 |---|---|---|
 | 内容 | 加密后的 mihomo 配置 | dae 的规则数据（明文，本身就是公开数据） |
-| 触发 | 私有仓库打 `v*` tag | 每天定时 |
+| 触发 | 私有仓库打 `v*` tag | 每周五 11:17 CST |
 | 谁推送 | 私有仓库 CI（PAT force-push） | 本仓库自己的 CI（内置 token） |
 | 消费者 | Clash Mi 客户端 | dae / daed |
 
@@ -144,7 +144,7 @@ jsDelivr:    https://cdn.jsdelivr.net/gh/aweyonhub/awey-pub@pub-geosite/dist/geo
 - 分支自述：`pub-geosite` 分支上的 [README.md](https://github.com/aweyonhub/awey-pub/blob/pub-geosite/README.md)（很短，只讲这是什么、怎么下、去哪看详情）
 - dae 后端的设计与约束：私有仓库 `aweyonhub/awey-mihomo` 的 `dae/README.md`（第 11 节就是本文档对应的设计说明）
 - 构建脚本：私有仓库 `scripts/build-dat.py`
-- workflow 模板：私有仓库 `dae/pub-geosite/geosite.yml`
+- workflow 副本：私有仓库 `dae/pub-geosite/geosite.yml`（与 `main` 上那份同步，只作对照留档）
 
 > **本文档是唯一的详细说明。** 分支上的 README 由 workflow 就地生成，
 > 内容刻意保持简短 —— 分支文档按仓库约定集中在 `main` 的 `branch/` 目录下，
