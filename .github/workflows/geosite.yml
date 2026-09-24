@@ -139,18 +139,9 @@ jobs:
               fh.write("\n")
           PY
 
-      # 与备份通道保持对称：推送失败时至少还有 artifact 可拿，也是排查发布问题的
-      # 第一手材料（分支上的内容是 force-push 覆盖的，出问题就查不到上一次了）。
-      - name: Upload geodata artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: geodata-${{ github.sha }}
-          path: |
-            ${{ env.OUT_DIR }}/geosite.dat
-            ${{ env.OUT_DIR }}/geoip.dat
-            ${{ env.OUT_DIR }}/manifest-geodata.json
-          if-no-files-found: error
-          retention-days: 7
+      # 这里刻意**没有** artifact 上传步骤：分支就是产物出口，同一份东西存两处
+      # 没有意义。备份通道（dae/pub-geosite/geodata.yml）有 —— 那边不设
+      # vars.PUBLIC_REPO 时没有任何发布出口，artifact 是唯一能拿到产物的方式。
 
       - name: Assemble branch tree
         shell: bash
