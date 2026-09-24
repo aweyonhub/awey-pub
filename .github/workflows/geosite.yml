@@ -60,7 +60,6 @@ jobs:
           echo "source commit: $(cat .source-sha)"
           test -f src/scripts/build-dat.py
           test -f src/config/40-rule-providers.yaml
-          test -f src/dae/pub-geosite/README.md
 
       - name: Install pinned yq
         shell: bash
@@ -140,13 +139,48 @@ jobs:
           # 分支布局：
           #   .github/workflows/geosite.yml   这个 workflow 自身（分支自描述）
           #   .gitattributes / .gitignore
-          #   README.md                       从私有仓库的模板拷来
+          #   README.md                       简短自述，就地写，不从私有仓库拷
           #   dist/                           三个产物
+          #
+          # README 刻意写短：完整文档在 awey-pub main 分支的 branch/pub-geosite.md
+          # （仓库约定：分支文档放 main 的 branch/ 目录）。分支上这份只需要回答
+          # 「这是什么、怎么下、去哪看详情」。
           rm -rf publish
-          mkdir -p publish/.github/workflows
+          mkdir -p publish/.github/workflows publish/dist
           cp .github/workflows/geosite.yml publish/.github/workflows/
-          cp src/dae/pub-geosite/README.md publish/README.md
-          cp -R dist publish/dist
+          cp dist/geosite.dat dist/geoip.dat dist/manifest-geodata.json publish/dist/
+
+          cat >publish/README.md <<'EOF'
+          # dae 规则数据
+
+          本分支是**独立 orphan 分支**，只放数据，**永远只有 1 个 commit**
+          （每次发布都 force-push 覆盖，不累积历史）。
+
+          ```text
+          dist/geosite.dat             域名分类（约 22 万条），v2ray GeoSiteList 格式
+          dist/geoip.dat               IP 分类，v2ray GeoIPList 格式
+          dist/manifest-geodata.json   size + sha256 + 生成时间 + 源提交
+          ```
+
+          由私有仓库 [`aweyonhub/awey-mihomo`](https://github.com/aweyonhub/awey-mihomo)
+          每天构建，源全部是公开规则表，所以本分支**不含任何个人配置或凭证**。
+
+          ## 用法
+
+          dae 会在 `config.dae` 所在目录查找 geodata，所以放到一起即可：
+
+          ```bash
+          cd /etc/dae          # 换成你的 config.dae 所在目录
+          base=https://raw.githubusercontent.com/aweyonhub/awey-pub/pub-geosite/dist
+          curl -fsSLO "$base/geosite.dat"
+          curl -fsSLO "$base/geoip.dat"
+          ```
+
+          ## 详情
+
+          完整说明见 [`branch/pub-geosite.md`](https://github.com/aweyonhub/awey-pub/blob/main/branch/pub-geosite.md)：
+          分类清单、系统目录用法、完整性校验脚本、jsDelivr 镜像、维护说明。
+          EOF
 
           cat >publish/.gitattributes <<'EOF'
           # 产物是二进制 protobuf，任何换行转换都会损坏它
