@@ -1,0 +1,23 @@
+{
+  "files": {
+    "config/40-rule-providers.yaml": {
+      "sha256": "495f9acfe1bbb9ad68e496534f81968aa57fc941c192d087afb77eb33087de09"
+    },
+    "geoip.dat": {
+      "sha256": "c5a66e34ddb271ba0166fcf13e59d89785e77f9402004d5989d0635ee833f89e",
+      "size": 137433
+    },
+    "geosite.dat": {
+      "sha256": "e8c871b80870813394f55efe5ec3529553b7ce4da9f8ef78f1051eed2788c069",
+      "size": 4651317
+    },
+    "scripts/build-dat.py": {
+      "sha256": "ce22831ca3a961161552fa377f93acfdbbb1c83ff320a597fc546b74d2f1db4c"
+    }
+  },
+  "generated_at": "2026-09-24T11:58:17Z",
+  "run_url": "https://github.com/aweyonhub/awey-pub/actions/runs/35996114439",
+  "source_commit": "2f139353fd18221245e67ea34719a5e76c57fd27",
+  "source_ref": "main",
+  "source_repo": "aweyonhub/awey-mihomo"
+}
