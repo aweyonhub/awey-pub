@@ -249,6 +249,9 @@ jobs:
                 rm -rf "$old"
                 exit 0
               fi
+              # 有差异就是真要推送：把本次新生成的 manifest 放回去，否则推上去的会是
+              # 「新 .dat + 旧 manifest」，sha256 / generated_at / source_commit 全错。
+              cp dist/manifest-geodata.json publish/dist/manifest-geodata.json
               echo "与 ${TARGET_BRANCH} 有差异："
               diff -rq --exclude=.git "$old" publish | sed 's/^/  /' || true
             fi
