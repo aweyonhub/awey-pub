@@ -1,0 +1,7 @@
+# 产物是二进制 protobuf，任何换行转换都会损坏它
+*.dat binary
+*.json text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+.gitignore text eol=lf
+/.gitattributes text eol=lf
